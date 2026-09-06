@@ -74,3 +74,33 @@ Postgres volume).
 3. Docker image builds for `task-api` and `task-web`, tagged with the commit SHA (build only — not pushed anywhere yet)
 
 AWS ECR push and deployment are future milestones, not yet implemented.
+
+## Local security scanning (Trivy)
+
+[Trivy](https://trivy.dev) scans for known vulnerabilities in dependencies and
+misconfigurations in the Dockerfiles. Install it (no admin rights required —
+download the portable binary):
+
+```bash
+# Windows: download the zip from https://github.com/aquasecurity/trivy/releases
+# and put trivy.exe somewhere on your PATH.
+# macOS: brew install trivy
+# Linux: see https://trivy.dev/latest/getting-started/installation/
+```
+
+Scan the repo (dependency vulnerabilities, Dockerfile misconfigurations, leaked secrets):
+
+```bash
+trivy fs --scanners vuln,secret,misconfig .
+```
+
+Scan a built image (after `docker compose build` or `docker build`):
+
+```bash
+docker compose build backend frontend
+trivy image docker_container_project_2-backend
+trivy image docker_container_project_2-frontend
+```
+
+Both Dockerfiles run as a non-root user and include a `HEALTHCHECK`, which
+Trivy's misconfiguration checks verify.
