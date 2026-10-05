@@ -108,6 +108,7 @@ jobs:
         with:
           context: ./backend
           push: true
+          provenance: false
           tags: |
             ${{ steps.ecr-login.outputs.registry }}/task-api:${{ github.sha }}
             ${{ steps.ecr-login.outputs.registry }}/task-api:latest
@@ -118,6 +119,7 @@ jobs:
         with:
           context: ./frontend
           push: true
+          provenance: false
           tags: |
             ${{ steps.ecr-login.outputs.registry }}/task-web:${{ github.sha }}
             ${{ steps.ecr-login.outputs.registry }}/task-web:latest
