@@ -4,7 +4,7 @@ A small full-stack Task Board app used as a hands-on CI/CD and DevOps learning p
 
 ## Current status
 
-FastAPI + PostgreSQL + Redis cache + basic Task CRUD, a React/TypeScript frontend, Dockerfiles for both, a Docker Compose stack, and a GitHub Actions CI pipeline (tests + build only — no AWS deployment yet).
+FastAPI + PostgreSQL + Redis cache + basic Task CRUD, a React/TypeScript frontend, Dockerfiles for both, a Docker Compose stack, and a GitHub Actions CI/CD pipeline that tests, builds, smoke-tests, and (on push to `main`) pushes both images to AWS ECR via OIDC. ECS/Fargate deployment is not yet implemented.
 
 ## Backend setup (local, no Docker yet)
 
@@ -71,10 +71,26 @@ Postgres volume).
 
 1. Backend tests (`pytest`)
 2. Frontend type-check + build (`tsc -b && vite build`)
-3. Docker image builds for `task-api` and `task-web`, tagged with the commit SHA, using Buildx with GitHub Actions layer caching (build only — not pushed anywhere yet). The `docker-build` job only runs if both test/build jobs above pass.
+3. Docker image builds for `task-api` and `task-web`, tagged with the commit SHA, using Buildx with GitHub Actions layer caching. The `docker-build` job only runs if both test/build jobs above pass.
 4. Each image is smoke-tested right after building: run the container, wait for it to respond (backend: `/health`, frontend: `/`), then tear it down. The backend smoke test points `DATABASE_URL` at a throwaway SQLite file so it doesn't need a real Postgres service in CI.
+5. On a push to `main` only (never on PRs), the `push-to-ecr` job re-builds both images (hitting the GHA cache from step 3, so it's fast) and pushes them to AWS ECR, tagged with both the commit SHA and `latest`.
 
-AWS ECR push and deployment are future milestones, not yet implemented.
+### AWS ECR
+
+Two private ECR repos exist in account `389072173099` (`us-east-1`), with scan-on-push enabled:
+`task-api` and `task-web`.
+
+Authentication uses GitHub's OIDC provider — no AWS access keys are stored in GitHub. The
+`push-to-ecr` job assumes IAM role `github-actions-ecr-push` via short-lived credentials;
+that role's trust policy only allows workflow runs triggered by a push to `main` in this
+repo to assume it (PRs and other branches/repos cannot), and its permissions policy is
+scoped only to pushing to these two repository ARNs — not account-wide ECR access.
+
+The role ARN and region are stored as GitHub repo variables (`AWS_ROLE_ARN`, `AWS_REGION`),
+not secrets, since a role ARN alone isn't sensitive without the trust policy that restricts
+who can assume it.
+
+Deployment (ECS/Fargate) is a future milestone, not yet implemented.
 
 ## Local security scanning (Trivy)
 

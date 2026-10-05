@@ -12,3 +12,5 @@ dist/
 
 .vscode/
 .idea/
+ecr-push-policy.json
+trust-policy.json

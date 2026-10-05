@@ -81,3 +81,44 @@ jobs:
             exit 1
           fi
           docker rm -f task-web-smoke
+
+  push-to-ecr:
+    runs-on: ubuntu-latest
+    needs: [docker-build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ steps.ecr-login.outputs.registry }}/task-api:${{ github.sha }}
+            ${{ steps.ecr-login.outputs.registry }}/task-api:latest
+          cache-from: type=gha,scope=backend
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ steps.ecr-login.outputs.registry }}/task-web:${{ github.sha }}
+            ${{ steps.ecr-login.outputs.registry }}/task-web:latest
+          cache-from: type=gha,scope=frontend
