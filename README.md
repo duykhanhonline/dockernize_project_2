@@ -71,7 +71,8 @@ Postgres volume).
 
 1. Backend tests (`pytest`)
 2. Frontend type-check + build (`tsc -b && vite build`)
-3. Docker image builds for `task-api` and `task-web`, tagged with the commit SHA (build only — not pushed anywhere yet)
+3. Docker image builds for `task-api` and `task-web`, tagged with the commit SHA, using Buildx with GitHub Actions layer caching (build only — not pushed anywhere yet). The `docker-build` job only runs if both test/build jobs above pass.
+4. Each image is smoke-tested right after building: run the container, wait for it to respond (backend: `/health`, frontend: `/`), then tear it down. The backend smoke test points `DATABASE_URL` at a throwaway SQLite file so it doesn't need a real Postgres service in CI.
 
 AWS ECR push and deployment are future milestones, not yet implemented.
 

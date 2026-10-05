@@ -38,15 +38,46 @@ jobs:
     needs: [backend-tests, frontend-build]
     steps:
       - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
       - name: Build backend image
         uses: docker/build-push-action@v6
         with:
           context: ./backend
           push: false
+          load: true
           tags: task-api:${{ github.sha }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+      - name: Smoke-test backend image
+        run: |
+          docker run -d --name task-api-smoke -p 8000:8000 \
+            -e DATABASE_URL=sqlite:////tmp/smoke.db \
+            task-api:${{ github.sha }}
+          if ! timeout 30 bash -c 'until curl -sf http://localhost:8000/health; do sleep 1; done'; then
+            echo "Backend health check failed, container logs:"
+            docker logs task-api-smoke
+            exit 1
+          fi
+          docker logs task-api-smoke
+          docker rm -f task-api-smoke
+
       - name: Build frontend image
         uses: docker/build-push-action@v6
         with:
           context: ./frontend
           push: false
+          load: true
           tags: task-web:${{ github.sha }}
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+
+      - name: Smoke-test frontend image
+        run: |
+          docker run -d --name task-web-smoke -p 5173:8080 task-web:${{ github.sha }}
+          if ! timeout 30 bash -c 'until curl -sf http://localhost:5173/; do sleep 1; done'; then
+            echo "Frontend health check failed, container logs:"
+            docker logs task-web-smoke
+            exit 1
+          fi
+          docker rm -f task-web-smoke
